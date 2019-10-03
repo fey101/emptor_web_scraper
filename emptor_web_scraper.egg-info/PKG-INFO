@@ -1,0 +1,21 @@
+Metadata-Version: 2.1
+Name: emptor-web-scraper
+Version: 0.0.1
+Summary: Project to process documents from the web
+Home-page: https://github.com/fey101/emptor_web_scraper
+Author: Faith Kangai
+Author-email: faithkangai.g@gmail.com
+License: MIT
+Description: # Emptor's Web Scraper Challenge
+        
+        The project is aimed towards creating a web scraper application with a serverless framework. It incorporates use of aws lambda and dynamo db.
+        
+        Input: url
+        Output: title of the web page
+        
+Platform: UNKNOWN
+Classifier: Programming Language :: Python :: 3 :: Only
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Classifier: Intended Audience :: Developers
+Description-Content-Type: text/markdown

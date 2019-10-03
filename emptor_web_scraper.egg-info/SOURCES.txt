@@ -1,0 +1,7 @@
+README.md
+setup.py
+emptor_web_scraper.egg-info/PKG-INFO
+emptor_web_scraper.egg-info/SOURCES.txt
+emptor_web_scraper.egg-info/dependency_links.txt
+emptor_web_scraper.egg-info/requires.txt
+emptor_web_scraper.egg-info/top_level.txt
