@@ -4,8 +4,6 @@ import asyncio
 
 import logging
 
-import os
-
 import uuid
 
 from tempfile import NamedTemporaryFile
@@ -17,6 +15,7 @@ from bs4 import BeautifulSoup
 import requests
 
 import boto3
+
 
 logging.basicConfig(filename='log', level=logging.INFO)
 LOGGER = logging.getLogger(__name__)
@@ -151,3 +150,12 @@ async def scraper(itemId):
     else:
         LOGGER.error('Encountered error {0} with msg {1}.'.format(
             resp.status_code, resp.reason))
+
+
+def query_dynamo_db_for_record_via_id(uid):
+    record = post_request_to_dynamodb(
+        'query',
+        KeyConditionExpression='#uid = :a',
+        ExpressionAttributeNames={'#uid': 'uuid'},
+        ExpressionAttributeValues={':a': {'S': uid}})
+    return record['Items'][0]

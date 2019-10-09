@@ -1,1 +1,1 @@
-["https://emptor-experiments.s3-eu-west-1.amazonaws.com/https%253A//www.owasp.org/index.php/Main_Page", "OWASP"]
+{"uuid": {"S": "9abaade1-ed80-4eff-95de-9114e636f165"}, "url": {"S": "https://www.tutorialspoint.com/data_communication_computer_network/transmission_control_protocol.htm"}, "s3url": {"S": "https://emptor-experiments.s3-eu-west-1.amazonaws.com/https%253A//www.tutorialspoint.com/data_communication_computer_network/transmission_control_protocol.htm"}, "state": {"S": "PROCESSED"}, "title": {"S": "DCN - Transmission Control Protocol - Tutorialspoint"}}
