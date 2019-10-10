@@ -20,11 +20,24 @@ def post_request_to_dynamodb(method, **kwargs):
     resp = getattr(dynamodb_client, method)(TableName=TABLENAME, **kwargs)
     return resp
 
+
 def query_dynamo_db_for_record_via_id(event, context):
-    uid = event['uid']
-    record = post_request_to_dynamodb(
-        'query',
-        KeyConditionExpression='#uid = :a',
-        ExpressionAttributeNames={'#uid': 'uuid'},
-        ExpressionAttributeValues={':a': {'S': uid}})
-    return record['Items'][0]
+    for recorded in event['Records']:
+        if recorded['eventName'] == 'INSERT':
+            uid = recorded['dynamodb']['NewImage']['uuid']['S']
+            record = post_request_to_dynamodb(
+                'query',
+                KeyConditionExpression='#uid = :a',
+                ExpressionAttributeNames={'#uid': 'uuid'},
+                ExpressionAttributeValues={':a': {'S': uid}})
+            print(record)
+            return record['Items'][0]
+
+
+# def query_dynamo_db_for_record_via_id(uid):
+#     record = post_request_to_dynamodb(
+#         'query',
+#         KeyConditionExpression='#uid = :a',
+#         ExpressionAttributeNames={'#uid': 'uuid'},
+#         ExpressionAttributeValues={':a': {'S': uid}})
+#     return record['Items'][0]

@@ -1,14 +1,12 @@
 #! /usr/bin/python3
 
-import asyncio
-
 import logging
 
 import uuid
 
 from tempfile import NamedTemporaryFile
 
-from urllib.parse import quote, unquote, urlparse
+from urllib.parse import quote, urlparse
 
 from bs4 import BeautifulSoup
 
@@ -46,7 +44,7 @@ def valid_url(user_supplied_url):
     return clean_url
 
 
-async def post_data_to_s3(key, data_stream):
+def post_data_to_s3(key, data_stream):
     key = key.rstrip('/')
     bucket = 'emptor-experiments'
     s3client = get_aws_service('s3')
@@ -67,14 +65,13 @@ async def post_data_to_s3(key, data_stream):
 
 
 def post_request_to_dynamodb(method, **kwargs):
-    TABLENAME = 'websites'
+    table = 'websites'
     dynamodb_client = get_aws_service('dynamodb')
-    resp = getattr(dynamodb_client, method)(TableName=TABLENAME, **kwargs)
+    resp = getattr(dynamodb_client, method)(TableName=table, **kwargs)
     return resp
 
 
-def process_website(event, context):
-    user_supplied_url = event['user_supplied_url']
+def process_website(user_supplied_url):
     url = valid_url(user_supplied_url)
     if not url:
         raise ValueError(
@@ -95,61 +92,65 @@ def process_website(event, context):
         }
         post_request_to_dynamodb('put_item', Item=item)
         # invoke scraper fn asynchronously
-        asyncio.run(scraper(id_string), debug=True)
+        # asyncio.run(scraper(id_string), debug=True)
         return id_string
     except Exception as e:
         LOGGER.error('Failed to process request on dynamodb.' +
                      ' {}'.format(e))
 
 
-async def scraper(itemId):
-    key = {
-        'uuid': {
-            'S': itemId
-        }
-    }
-    record = post_request_to_dynamodb('get_item', Key=key)
-    url = record['Item']["url"]['S']
-    LOGGER.info('Processing {}'.format(url))
-    baseheaders = requests.utils.default_headers()
-    user_agent = 'Mozilla/5.0 (X11; Ubuntu; ' \
-        'Linux x86_64; rv:52.0) Gecko/20100101 Firefox/52.0'
-    baseheaders.update({'User-Agent': user_agent})
-    resp = requests.get(url, headers=baseheaders)
-    if resp.status_code == 200:
-        url_string = quote(url)
-        s3_objurl = await post_data_to_s3(url_string, resp.content)
-        datapage = BeautifulSoup(resp.content, 'html.parser')
-        pagetitle = get_title(datapage)
-        update_data = {
-            'state': {
-                'Value': {
-                    'S': 'PROCESSED'
-                },
-                'Action': 'PUT'
-            },
-            's3url': {
-                'Value': {
-                    'S': s3_objurl
-                },
-                'Action': 'PUT'
-            },
-        }
-        if pagetitle:
-            update_data.update(title={
-                'Value': {'S': pagetitle},
-                'Action': 'PUT'}
-            )
-        post_request_to_dynamodb(
-            'update_item',
-            Key=key,
-            AttributeUpdates=update_data,
-            ReturnValues='ALL_NEW'
-        )
-        return s3_objurl, pagetitle
-    else:
-        LOGGER.error('Encountered error {0} with msg {1}.'.format(
-            resp.status_code, resp.reason))
+def scraper(event, context):
+    for stream in event['Records']:
+        if stream['eventName'] == 'INSERT' and stream[
+                'dynamodb']['NewImage']['state']['S'] == 'PENDING':
+            item_id = stream['dynamodb']['NewImage']['uuid']['S']
+            key = {
+                'uuid': {
+                    'S': item_id
+                }
+            }
+            record = post_request_to_dynamodb('get_item', Key=key)
+            url = record['Item']["url"]['S']
+            LOGGER.info('Processing {}'.format(url))
+            baseheaders = requests.utils.default_headers()
+            user_agent = 'Mozilla/5.0 (X11; Ubuntu; ' \
+                'Linux x86_64; rv:52.0) Gecko/20100101 Firefox/52.0'
+            baseheaders.update({'User-Agent': user_agent})
+            resp = requests.get(url, headers=baseheaders)
+            if resp.status_code == 200:
+                url_string = quote(url)
+                s3_objurl = post_data_to_s3(url_string, resp.content)
+                datapage = BeautifulSoup(resp.content, 'html.parser')
+                pagetitle = get_title(datapage)
+                update_data = {
+                    'state': {
+                        'Value': {
+                            'S': 'PROCESSED'
+                        },
+                        'Action': 'PUT'
+                    },
+                    's3url': {
+                        'Value': {
+                            'S': s3_objurl
+                        },
+                        'Action': 'PUT'
+                    },
+                }
+                if pagetitle:
+                    update_data.update(title={
+                        'Value': {'S': pagetitle},
+                        'Action': 'PUT'}
+                    )
+                post_request_to_dynamodb(
+                    'update_item',
+                    Key=key,
+                    AttributeUpdates=update_data,
+                    ReturnValues='ALL_NEW'
+                )
+                return s3_objurl, pagetitle, item_id
+            else:
+                LOGGER.error('Encountered error {0} with msg {1}.'.format(
+                    resp.status_code, resp.reason))
 
 
 def query_dynamo_db_for_record_via_id(uid):
