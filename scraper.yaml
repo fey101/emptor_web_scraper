@@ -1,0 +1,111 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Describes the stack for the scraper serverless application.
+Globals:
+  Function:
+    Timeout: 900  #15 min
+
+Resources:
+  Function:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: web_scraper
+      Description: "Lambda function triggered by insertion of record into a dynamo db table to process documents from the web."
+      CodeUri: emptor-challenge/
+      Handler: web_scraper.scraper
+      Runtime: python3.7
+      Role: Lambda-role
+      Policies:
+        - AmazonS3FullAccess
+        - AmazonDynamoDBFullAccess
+        - AWSLambdaBasicExecutionRole
+      Events:
+        DynamoDBStream:
+          Type: DynamoDB
+          Properties:
+            Stream: !GetAtt DynamoTable.StreamArn
+            StartingPosition: TRIM_HORIZON
+            BatchSize: 10
+            MaximumBatchingWindowInSeconds: 0
+            Enabled: true
+  DynamoTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        -
+          AttributeName: "uuid"
+          AttributeType: "S"
+      KeySchema:
+        AttributeName: "uuid"
+        KeyType: "HASH"
+      TableName: "websites"
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+      WriteCapacityScalableTarget:
+        Type: AWS::ApplicationAutoScaling::ScalableTarget
+        Properties:
+          MaxCapacity: 15
+          MinCapacity: 5
+          ResourceId: !Join
+            - /
+            - - table
+              - !Ref DDBTable
+          RoleARN: !GetAtt ScalingRole.Arn
+          ScalableDimension: dynamodb:table:WriteCapacityUnits
+          ServiceNamespace: dynamodb
+      ScalingRole:
+        Type: AWS::IAM::Role
+        Properties:
+          AssumeRolePolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              -
+                Effect: "Allow"
+                Principal:
+                  Service:
+                    - application-autoscaling.amazonaws.com
+                Action:
+                  - "sts:AssumeRole"
+          Path: "/"
+          Policies:
+            -
+              PolicyName: "root"
+              PolicyDocument:
+                Version: "2012-10-17"
+                Statement:
+                  -
+                    Effect: "Allow"
+                    Action:
+                      - "dynamodb:DescribeTable"
+                      - "dynamodb:UpdateTable"
+                      - "cloudwatch:PutMetricAlarm"
+                      - "cloudwatch:DescribeAlarms"
+                      - "cloudwatch:GetMetricStatistics"
+                      - "cloudwatch:SetAlarmState"
+                      - "cloudwatch:DeleteAlarms"
+                    Resource: "*"
+      WriteScalingPolicy:
+        Type: AWS::ApplicationAutoScaling::ScalingPolicy
+        Properties:
+          PolicyName: WriteAutoScalingPolicy
+          PolicyType: TargetTrackingScaling
+          ScalingTargetId: !Ref WriteCapacityScalableTarget
+          TargetTrackingScalingPolicyConfiguration:
+            TargetValue: 50.0
+            ScaleInCooldown: 60
+            ScaleOutCooldown: 60
+            PredefinedMetricSpecification:
+              PredefinedMetricType: DynamoDBWriteCapacityUtilization
+  S3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: emptor-experiments
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      VersioningConfiguration:
+        Status: Enabled
+
+
+

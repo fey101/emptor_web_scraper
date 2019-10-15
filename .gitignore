@@ -3,3 +3,7 @@ log
 urls.txt
 __pycache__/
 test.json
+emptor_web_scraper.egg-info
+vendor/
+emptor-challenge/
+.DS_Store

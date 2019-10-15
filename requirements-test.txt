@@ -1,3 +1,4 @@
 -r requirements.txt
 
-flake8==2.5.1 
+flake8==2.5.1
+yamllint>=1.9
